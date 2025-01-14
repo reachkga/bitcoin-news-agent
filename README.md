@@ -47,9 +47,106 @@ The system consists of three main agents:
 
 1. Clone the repository:
 ```bash
-git clone https://github.com/YOUR_USERNAME/bitcoin-news-agent.git
+git clone https://github.com/reachkga/bitcoin-news-agent.git
 cd bitcoin-news-agent
 ```
 
 2. Create and activate virtual environment:
+```bash
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
 ```
+
+3. Install dependencies:
+```bash
+pip install -r requirements.txt
+```
+
+4. Set up environment variables:
+```bash
+cp .env.example .env
+```
+Then edit `.env` with your actual credentials.
+
+## Gmail App Password Setup
+
+1. Go to your Google Account settings
+2. Enable 2-Step Verification if not already enabled
+3. Go to Security → App passwords
+4. Select 'Mail' and 'Other (Custom name)'
+5. Name it "Finance Agent"
+6. Copy the generated 16-character password to your .env file
+
+## Usage
+
+1. Make the start and stop scripts executable:
+```bash
+chmod +x start_agents.sh stop_agents.sh
+```
+
+2. Start the agents:
+```bash
+./start_agents.sh
+```
+
+3. Monitor the logs:
+```bash
+tail -f logs/crypto_agents.log
+tail -f logs/scheduler.log
+```
+
+4. Stop the agents:
+```bash
+./stop_agents.sh
+```
+
+## Logs
+
+The system maintains two log files in the `logs` directory:
+- `crypto_agents.log`: Contains execution logs of all agents
+- `scheduler.log`: Contains scheduler-specific logs
+
+## Configuration
+
+- Default schedule: Every 10 minutes
+- To modify the schedule, edit `scheduler.py`
+- Email settings can be configured in `email_agent.py`
+- Data fetching parameters can be adjusted in respective agent files
+
+## Project Structure
+
+```
+bitcoin-news-agent/
+├── btc_agent.py          # Bitcoin price fetching
+├── info_agent.py         # News aggregation
+├── email_agent.py        # Report generation and sending
+├── scheduler.py          # Scheduling system
+├── start_agents.sh       # Startup script
+├── stop_agents.sh        # Shutdown script
+├── requirements.txt      # Dependencies
+├── .env.example         # Example environment variables
+└── logs/                # Log files
+```
+
+## Contributing
+
+1. Fork the repository
+2. Create your feature branch
+3. Commit your changes
+4. Push to the branch
+5. Create a new Pull Request
+
+## License
+
+This project is licensed under the MIT License - see the LICENSE file for details.
+
+## Acknowledgments
+
+- OpenAI GPT-4 for analysis
+- Brave API for financial data
+- Supabase for data storage
+- Python Schedule library for task scheduling
+
+## Support
+
+For support, please open an issue in the GitHub repository.

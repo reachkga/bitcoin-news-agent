@@ -57,8 +57,17 @@ def create_analysis(btc_data, news_data):
     if not btc_data:
         return None
         
-    # Check if we have any new news
-    has_news = bool(news_data)
+    # Check if we have any new news in the last 10 minutes
+    current_time = datetime.now(timezone.utc)
+    has_news = False
+    
+    if news_data:
+        for news in news_data:
+            news_time = datetime.fromisoformat(news['timestamp'].replace('Z', '+00:00'))
+            time_diff = (current_time - news_time).total_seconds() / 60  # Convert to minutes
+            if time_diff <= 10:  # Check if news is from last 10 minutes
+                has_news = True
+                break
     
     # Prepare the price context
     context = "Recent Bitcoin Prices:\n"
@@ -69,7 +78,10 @@ def create_analysis(btc_data, news_data):
     if has_news:
         context += "\nRecent Financial News:\n"
         for news in news_data:
-            context += f"- {news['finance_info']}\n"
+            news_time = datetime.fromisoformat(news['timestamp'].replace('Z', '+00:00'))
+            time_diff = (current_time - news_time).total_seconds() / 60
+            if time_diff <= 10:  # Only include news from last 10 minutes
+                context += f"- {news['finance_info']}\n"
         
         system_content = """You are a professional financial and crypto analyst. Create a very concise but insightful analysis 
                         of the recent Bitcoin price movements and related financial news. Focus on key correlations 

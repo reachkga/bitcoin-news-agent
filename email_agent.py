@@ -30,11 +30,20 @@ supabase = create_client(
 def get_latest_data():
     """Fetch latest data from both tables"""
     try:
-        # Get latest BTC price data (last 3 entries)
-        btc_data = supabase.table('btc_price').select('*').order('created_at', desc=True).limit(3).execute()
+        # Get Bitcoin price data for the last 24 hours
+        today = datetime.now(timezone.utc).date()
+        btc_data = supabase.table('btc_price')\
+            .select('*')\
+            .gte('created_at', today.isoformat())\
+            .order('created_at', desc=True)\
+            .execute()
         
         # Get latest news (last 10 entries)
-        news_data = supabase.table('eco_info').select('*').order('timestamp', desc=True).limit(10).execute()
+        news_data = supabase.table('eco_info')\
+            .select('*')\
+            .order('timestamp', desc=True)\
+            .limit(10)\
+            .execute()
         
         return btc_data.data, news_data.data
     except Exception as e:
@@ -44,27 +53,43 @@ def get_latest_data():
 def create_analysis(btc_data, news_data):
     """Use OpenAI to analyze the data and create an email content"""
     
-    # Prepare the context
+    # Check if we have any price data
+    if not btc_data:
+        return None
+        
+    # Check if we have any new news
+    has_news = bool(news_data)
+    
+    # Prepare the price context
     context = "Recent Bitcoin Prices:\n"
     for price in btc_data:
         context += f"- ${price['price']:,.2f} at {price['created_at']}\n"
     
-    context += "\nRecent Financial News:\n"
-    for news in news_data:
-        context += f"- {news['finance_info']}\n"
+    # Create different prompts based on whether we have news
+    if has_news:
+        context += "\nRecent Financial News:\n"
+        for news in news_data:
+            context += f"- {news['finance_info']}\n"
+        
+        system_content = """You are a professional financial and crypto analyst. Create a very concise but insightful analysis 
+                        of the recent Bitcoin price movements and related financial news. Focus on key correlations 
+                        between market events and price changes. Keep the analysis short, professional, and 
+                        actionable. Format in a clear email structure with a subject line. End the email with 
+                        'Best Regards,' on a new line."""
+    else:
+        system_content = """You are a professional financial analyst. Create a very brief price update email focusing only on 
+                        the Bitcoin price movements. Keep it concise and professional. Format with a subject line that 
+                        indicates it's a price update only. End the email with 'Best Regards,' on a new line."""
     
     # Create the prompt for OpenAI
     messages = [
         {
             "role": "system",
-            "content": """You are a professional financial and crypto analyst. Create a very concise but insightful analysis 
-                        of the recent Bitcoin price movements and related financial news. Focus on key correlations 
-                        between market events and price changes. Keep the analysis short, professional, and 
-                        actionable. Format in a clear email structure with a subject line."""
+            "content": system_content
         },
         {
             "role": "user",
-            "content": f"Based on this data, create a short analysis email:\n\n{context}"
+            "content": f"Based on this data, create a {'short analysis' if has_news else 'brief price update'} email:\n\n{context}"
         }
     ]
     
@@ -73,7 +98,21 @@ def create_analysis(btc_data, news_data):
             model="gpt-4",
             messages=messages
         )
-        return response.choices[0].message.content
+        
+        # Add signature to the email content
+        email_content = response.choices[0].message.content
+        
+        signature = "\n\n--\nFinance Agent\nAutomated Market Analysis\n"
+        signature += "Updates every 10 minutes | 24/7 monitoring\n"
+        
+        # Insert signature after "Best Regards" or at the end
+        if "Best Regards," in email_content:
+            email_content = email_content.replace("Best Regards,", "Best Regards," + signature)
+        else:
+            email_content += signature
+            
+        return email_content
+        
     except Exception as e:
         print(f"Error creating analysis with OpenAI: {e}")
         return None
@@ -85,20 +124,33 @@ def create_price_graph(btc_data):
         timestamps = [datetime.fromisoformat(price['created_at'].replace('Z', '+00:00')) for price in btc_data]
         prices = [price['price'] for price in btc_data]
 
-        # Create the plot
-        plt.figure(figsize=(10, 6))
-        plt.plot(timestamps, prices, 'b-', label='BTC Price')
+        # Create the plot with a larger figure size
+        plt.figure(figsize=(12, 6))
+        plt.plot(timestamps, prices, 'b-', label='BTC Price', linewidth=2)
         
         # Format the plot
-        plt.title('Bitcoin Price Trend')
-        plt.xlabel('Time')
-        plt.ylabel('Price (USD)')
-        plt.grid(True)
-        plt.legend()
+        plt.title('Bitcoin Price Trend (24 Hours)', fontsize=14)
+        plt.xlabel('Time (UTC)', fontsize=12)
+        plt.ylabel('Price (USD)', fontsize=12)
+        plt.grid(True, linestyle='--', alpha=0.7)
+        plt.legend(fontsize=10)
         
         # Format x-axis to show readable timestamps
-        plt.gcf().autofmt_xdate()
-        plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d %H:%M'))
+        plt.gcf().autofmt_xdate()  # Angle and align the tick labels
+        plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%H:%M'))  # Show hours:minutes
+        
+        # Add price annotations at start and end
+        if prices:
+            plt.annotate(f'${prices[-1]:,.2f}', 
+                        (timestamps[-1], prices[-1]),
+                        xytext=(10, 10), textcoords='offset points')
+            plt.annotate(f'${prices[0]:,.2f}',
+                        (timestamps[0], prices[0]),
+                        xytext=(-10, 10), textcoords='offset points',
+                        horizontalalignment='right')
+        
+        # Adjust layout to prevent label cutoff
+        plt.tight_layout()
         
         # Save plot to bytes buffer
         buf = BytesIO()

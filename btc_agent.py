@@ -51,5 +51,28 @@ def get_and_store_btc_price():
         print(f"Error storing data in Supabase: {e}")
         return None
 
+def get_latest_data():
+    """Fetch latest data from both tables"""
+    try:
+        # Get Bitcoin price data for the last 24 hours
+        today = datetime.now(timezone.utc).date()
+        btc_data = supabase.table('btc_price')\
+            .select('*')\
+            .gte('created_at', today.isoformat())\
+            .order('created_at', desc=True)\
+            .execute()
+        
+        # Get latest news (last 10 entries)
+        news_data = supabase.table('eco_info')\
+            .select('*')\
+            .order('timestamp', desc=True)\
+            .limit(10)\
+            .execute()
+        
+        return btc_data.data, news_data.data
+    except Exception as e:
+        print(f"Error fetching data from Supabase: {e}")
+        return None, None
+
 if __name__ == "__main__":
     get_and_store_btc_price() 
